@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: autoya-backend:ci
+    container_name: autoya-backend
+    ports:
+      - "10080:8080"
+    env_file:
+      - .env.dev
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: autoya-frontend:ci
+    container_name: autoya-frontend
+    ports:
+      - "10081:80"
+    env_file:
+      - .env.dev
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:15
+    container_name: postgres-dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "10543:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "10679:6379"
+    volumes:
+      - redis_data:/data
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "10090:9000"
+      - "10091:9001"
+    volumes:
+      - minio_data:/data
+
+  # 👇 Servicio para configurar política pública automáticamente
+  minio-setup:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5 &&
+      mc alias set myminio ${MINIO_ENDPOINT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+      mc mb -p myminio/autoya-${BRANCH} || true &&
+      mc anonymous set download myminio/autoya-${BRANCH} &&
+      echo '✅ Bucket autoya-dev público listo.'
+      "
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

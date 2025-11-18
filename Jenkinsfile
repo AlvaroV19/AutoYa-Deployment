@@ -7,32 +7,50 @@ pipeline {
   }
 
   environment {
-    // Selección dinámica de archivos según ambiente
+    // Selección dinámica del entorno
     COMPOSE_FILE = "docker-compose.dev.yml"
     ENV_FILE = ".env.dev"
     BRANCH_NAME = "dev"
+
+    // Repositorios externos
+    FRONTEND_REPO = "https://github.com/AlvaroV19/AutoYa-Frontend.git"
+    BACKEND_REPO  = "https://github.com/AlvaroV19/AutoYa-Backend.git"
   }
 
   stages {
-    stage('Checkout') {
+
+    stage('Checkout Deploy Repo') {
       steps {
-        // Jenkins Multibranch ya hace el checkout automáticamente,
-        // pero esto garantiza que tengamos la última versión
         checkout scm
-        echo "🌀 Branch actual: ${env.BRANCH_NAME}"
+        echo "🌀 Branch actual: ${BRANCH_NAME}"
+      }
+    }
+
+    stage('Clone Frontend & Backend') {
+      steps {
+        echo "📥 Clonando Frontend y Backend..."
+
+        sh """
+          rm -rf frontend backend
+
+          git clone ${FRONTEND_REPO} frontend
+          git clone ${BACKEND_REPO} backend
+        """
       }
     }
 
     stage('Build images') {
       steps {
         sh """
-          # Extrae la URL de API del .env correspondiente
-          API_URL=\$(grep VITE_API_URL \$ENV_FILE | cut -d '=' -f2-)
-          echo "API_URL=\$API_URL"
-          # Build frontend con la variable correcta
+          echo "🔍 Obteniendo VITE_API_URL desde ${ENV_FILE}..."
+          API_URL=\$(grep VITE_API_URL ${ENV_FILE} | cut -d '=' -f2-)
+          echo "🌐 API_URL=\$API_URL"
+
+          echo "🚧 Construyendo imagen del FRONTEND..."
           docker build -t autoya-frontend --build-arg VITE_API_URL=\$API_URL -f frontend/Dockerfile frontend
-          # Build otros servicios normalmente
-          docker compose -f \$COMPOSE_FILE --env-file \$ENV_FILE build --pull --parallel
+
+          echo "🚧 Construyendo servicios del BACKEND y otros..."
+          docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} build --pull --parallel
         """
       }
     }
@@ -40,8 +58,11 @@ pipeline {
     stage('Deploy') {
       steps {
         sh """
-          docker compose -f \$COMPOSE_FILE --env-file \$ENV_FILE down -v || true
-          docker compose -f \$COMPOSE_FILE --env-file \$ENV_FILE up -d --build
+          echo "🛑 Deteniendo entorno DEV..."
+          docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} down -v || true
+
+          echo "🚀 Levantando DEV..."
+          docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d --build
         """
       }
     }
@@ -49,10 +70,11 @@ pipeline {
 
   post {
     success {
-      echo "✅ Deploy successful on branch: ${env.BRANCH_NAME}"
+      echo "✅ Deploy successful on branch: ${BRANCH_NAME}"
     }
     failure {
-      echo "❌ Deploy failed on branch: ${env.BRANCH_NAME}"
+      echo "❌ Deploy failed on branch: ${BRANCH_NAME}"
     }
   }
 }
+

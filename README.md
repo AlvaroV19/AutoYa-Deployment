@@ -74,3 +74,4 @@ Servicio	Puerto:
 - **Frontend AutoYa**: https://github.com/AlvaroV19/AutoYa-Frontend
 - **Backend AutoYa**: https://github.com/AlvaroV19/AutoYa-Backend
 - **Docs AutoYa**: https://github.com/AlvaroV19/AutoYa-Docs
+- **Repository Legacy**: https://github.com/beyner62838/AutoYa

@@ -67,3 +67,10 @@ Servicio	Puerto:
 - Redis	10679 → 6379
 - MinIO API	10090 → 9000
 - MinIO Console	10091 → 9001
+
+---
+
+## Enlaces del proyecto
+- **Frontend AutoYa**: https://github.com/AlvaroV19/AutoYa-Frontend
+- **Backend AutoYa**: https://github.com/AlvaroV19/AutoYa-Backend
+- **Docs AutoYa**: https://github.com/AlvaroV19/AutoYa-Docs

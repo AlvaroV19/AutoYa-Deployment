@@ -1,0 +1,82 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: autoya-backend:qa
+    container_name: autoya-backend-qa
+    ports:
+      - "11080:8080"
+    env_file:
+      - .env.qa
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: autoya-frontend:qa
+    container_name: autoya-frontend-qa
+    ports:
+      - "11081:80"
+    env_file:
+      - .env.qa
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:15
+    container_name: postgres-qa
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "11543:5432"
+    volumes:
+      - postgres_data_qa:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: redis-qa
+    ports:
+      - "11679:6379"
+    volumes:
+      - redis_data_qa:/data
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio-qa
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "11090:9000"
+      - "11091:9001"
+    volumes:
+      - minio_data_qa:/data
+
+  # 👇 Servicio auxiliar para crear bucket y hacerlo público automáticamente
+  minio-setup:
+    image: quay.io/minio/mc:latest
+    container_name: minio-setup-qa
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      echo '🕓 Esperando inicio de MinIO...' &&
+      sleep 8 &&
+      mc alias set myminio ${MINIO_ENDPOINT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+      mc mb -p myminio/autoya-${BRANCH} || true &&
+      mc anonymous set download myminio/autoya-${BRANCH} &&
+      echo '✅ Bucket autoya-${BRANCH} público y listo.'
+      "
+
+volumes:
+  postgres_data_qa:
+  redis_data_qa:
+  minio_data_qa:

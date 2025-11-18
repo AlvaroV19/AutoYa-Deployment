@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: autoya-backend:main
+    container_name: autoya-backend-main
+    ports:
+      - "12080:8080"   # Backend producción
+    env_file:
+      - .env.main
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: autoya-frontend:main
+    container_name: autoya-frontend-main
+    ports:
+      - "12081:80"     # Front producción
+    env_file:
+      - .env.main
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:15
+    container_name: postgres-main
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "12543:5432"   # Puerto diferente a dev y QA
+    volumes:
+      - postgres_data_main:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: redis-main
+    ports:
+      - "12679:6379"   # Puerto redis main
+    volumes:
+      - redis_data_main:/data
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio-main
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "12090:9000"   # API MinIO
+      - "12091:9001"   # Consola MinIO
+    volumes:
+      - minio_data_main:/data
+
+  minio-setup:
+    image: quay.io/minio/mc:latest
+    container_name: minio-setup-main
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      echo '⏳ Esperando MinIO...' &&
+      sleep 8 &&
+      mc alias set myminio ${MINIO_ENDPOINT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+      mc mb -p myminio/autoya-${BRANCH} || true &&
+      mc anonymous set download myminio/autoya-${BRANCH} &&
+      echo '✅ Bucket autoya-${BRANCH} público y listo.'
+      "
+
+volumes:
+  postgres_data_main:
+  redis_data_main:
+  minio_data_main:
